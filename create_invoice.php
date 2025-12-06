@@ -18,27 +18,29 @@ if (!$data) {
     exit();
 }
 
-$invoice_number = $conn->real_escape_string($data->invoice_number);
-$customer_name = $conn->real_escape_string($data->customer_name);
-$customer_email = $conn->real_escape_string($data->customer_email);
-$customer_phone = $conn->real_escape_string($data->customer_phone);
-$invoice_date = $conn->real_escape_string($data->invoice_date);
-$due_date = $conn->real_escape_string($data->due_date);
-$items = $conn->real_escape_string(json_encode($data->items));
+$invoice_number = $data->invoice_number;
+$customer_name = $data->customer_name;
+$customer_email = $data->customer_email;
+$customer_phone = $data->customer_phone;
+$invoice_date = $data->invoice_date;
+$due_date = $data->due_date;
+$items = json_encode($data->items);
 $subtotal = floatval($data->subtotal);
 $tax = floatval($data->tax);
 $total = floatval($data->total);
-$status = $conn->real_escape_string($data->status);
-$notes = isset($data->notes) ? $conn->real_escape_string($data->notes) : '';
+$status = $data->status;
+$notes = isset($data->notes) ? $data->notes : '';
 
-$sql = "INSERT INTO invoices (invoice_number, customer_name, customer_email, customer_phone, invoice_date, due_date, items, subtotal, tax, total, status, notes) 
-        VALUES ('$invoice_number', '$customer_name', '$customer_email', '$customer_phone', '$invoice_date', '$due_date', '$items', $subtotal, $tax, $total, '$status', '$notes')";
+$stmt = $conn->prepare("INSERT INTO invoices (invoice_number, customer_name, customer_email, customer_phone, invoice_date, due_date, items, subtotal, tax, total, status, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+$stmt->bind_param("sssssssdddss", $invoice_number, $customer_name, $customer_email, $customer_phone, $invoice_date, $due_date, $items, $subtotal, $tax, $total, $status, $notes);
 
-if ($conn->query($sql)) {
+if ($stmt->execute()) {
     echo json_encode(["status" => "success", "message" => "Invoice created successfully", "id" => $conn->insert_id]);
 } else {
-    echo json_encode(["status" => "error", "message" => "Failed to create invoice: " . $conn->error]);
+    echo json_encode(["status" => "error", "message" => "Failed to create invoice: " . $stmt->error]);
 }
+
+$stmt->close();
 
 $conn->close();
 ?>

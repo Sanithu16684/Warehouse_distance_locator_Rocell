@@ -19,43 +19,33 @@ if (!$data || !isset($data->id)) {
 }
 
 $id = intval($data->id);
-$invoice_number = $conn->real_escape_string($data->invoice_number);
-$customer_name = $conn->real_escape_string($data->customer_name);
-$customer_email = $conn->real_escape_string($data->customer_email);
-$customer_phone = $conn->real_escape_string($data->customer_phone);
-$invoice_date = $conn->real_escape_string($data->invoice_date);
-$due_date = $conn->real_escape_string($data->due_date);
-$items = $conn->real_escape_string(json_encode($data->items));
+$invoice_number = $data->invoice_number;
+$customer_name = $data->customer_name;
+$customer_email = $data->customer_email;
+$customer_phone = $data->customer_phone;
+$invoice_date = $data->invoice_date;
+$due_date = $data->due_date;
+$items = json_encode($data->items);
 $subtotal = floatval($data->subtotal);
 $tax = floatval($data->tax);
 $total = floatval($data->total);
-$status = $conn->real_escape_string($data->status);
-$notes = isset($data->notes) ? $conn->real_escape_string($data->notes) : '';
+$status = $data->status;
+$notes = isset($data->notes) ? $data->notes : '';
 
-$sql = "UPDATE invoices SET 
-        invoice_number = '$invoice_number',
-        customer_name = '$customer_name',
-        customer_email = '$customer_email',
-        customer_phone = '$customer_phone',
-        invoice_date = '$invoice_date',
-        due_date = '$due_date',
-        items = '$items',
-        subtotal = $subtotal,
-        tax = $tax,
-        total = $total,
-        status = '$status',
-        notes = '$notes'
-        WHERE id = $id";
+$stmt = $conn->prepare("UPDATE invoices SET invoice_number = ?, customer_name = ?, customer_email = ?, customer_phone = ?, invoice_date = ?, due_date = ?, items = ?, subtotal = ?, tax = ?, total = ?, status = ?, notes = ? WHERE id = ?");
+$stmt->bind_param("sssssssdddssi", $invoice_number, $customer_name, $customer_email, $customer_phone, $invoice_date, $due_date, $items, $subtotal, $tax, $total, $status, $notes, $id);
 
-if ($conn->query($sql)) {
-    if ($conn->affected_rows > 0) {
+if ($stmt->execute()) {
+    if ($stmt->affected_rows > 0) {
         echo json_encode(["status" => "success", "message" => "Invoice updated successfully"]);
     } else {
         echo json_encode(["status" => "info", "message" => "No changes made or invoice not found"]);
     }
 } else {
-    echo json_encode(["status" => "error", "message" => "Failed to update invoice: " . $conn->error]);
+    echo json_encode(["status" => "error", "message" => "Failed to update invoice: " . $stmt->error]);
 }
+
+$stmt->close();
 
 $conn->close();
 ?>
