@@ -1,0 +1,22 @@
+# Demo files for visual testing only
+*_demo.html
+
+# Temporary files
+/tmp/
+
+# Log files
+*.log
+
+# Database connection config (if added later)
+db_config.php
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
