@@ -18,11 +18,19 @@ if (!$data || !isset($data->id)) {
     exit();
 }
 
+// Validate required fields
+if (empty($data->invoice_number) || empty($data->customer_name) || 
+    empty($data->invoice_date) || empty($data->due_date) || 
+    empty($data->status) || !isset($data->items)) {
+    echo json_encode(["status" => "error", "message" => "Missing required fields"]);
+    exit();
+}
+
 $id = intval($data->id);
 $invoice_number = $data->invoice_number;
 $customer_name = $data->customer_name;
-$customer_email = $data->customer_email;
-$customer_phone = $data->customer_phone;
+$customer_email = isset($data->customer_email) ? $data->customer_email : '';
+$customer_phone = isset($data->customer_phone) ? $data->customer_phone : '';
 $invoice_date = $data->invoice_date;
 $due_date = $data->due_date;
 $items = json_encode($data->items);

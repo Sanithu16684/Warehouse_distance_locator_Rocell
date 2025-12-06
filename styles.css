@@ -436,7 +436,7 @@ tbody tr:hover {
   }
 
   .table-container {
-    overflow-x: scroll;
+    overflow-x: auto;
   }
 
   table {
