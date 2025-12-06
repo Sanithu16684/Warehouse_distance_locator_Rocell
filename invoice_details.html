@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Invoice Details</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>👁️ Invoice Details</h1>
+      <p>View complete invoice information</p>
+      <div class="nav-buttons">
+        <a href="invoices.html" class="btn btn-secondary">⬅️ Back to Invoices</a>
+        <button onclick="window.print()" class="btn btn-primary">🖨️ Print</button>
+      </div>
+    </header>
+
+    <main>
+      <div id="loading" class="loading">
+        <div class="spinner"></div>
+        <p>Loading invoice...</p>
+      </div>
+
+      <div id="invoice-detail" class="invoice-detail hidden">
+        <div class="detail-header">
+          <div>
+            <h2 style="color: #667eea; margin-bottom: 10px;">INVOICE</h2>
+            <h3 id="invoice-number" style="color: #333;"></h3>
+            <p class="text-muted">Created: <span id="created-date"></span></p>
+          </div>
+          <div style="text-align: right;">
+            <span id="status-badge" class="status-badge"></span>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 30px; margin-bottom: 30px;">
+          <div class="detail-section">
+            <h3>📋 Invoice Information</h3>
+            <div class="detail-row">
+              <span class="detail-label">Invoice Date:</span>
+              <span class="detail-value" id="invoice-date"></span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">Due Date:</span>
+              <span class="detail-value" id="due-date"></span>
+            </div>
+          </div>
+
+          <div class="detail-section">
+            <h3>👤 Customer Information</h3>
+            <div class="detail-row">
+              <span class="detail-label">Name:</span>
+              <span class="detail-value" id="customer-name"></span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">Email:</span>
+              <span class="detail-value" id="customer-email"></span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">Phone:</span>
+              <span class="detail-value" id="customer-phone"></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="detail-section">
+          <h3>📦 Invoice Items</h3>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Description</th>
+                  <th style="text-align: center;">Quantity</th>
+                  <th style="text-align: right;">Unit Price</th>
+                  <th style="text-align: right;">Total</th>
+                </tr>
+              </thead>
+              <tbody id="items-tbody">
+                <!-- Items will be loaded here -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="invoice-summary">
+          <div class="summary-row">
+            <span class="summary-label">Subtotal:</span>
+            <span id="subtotal-display">Rs. 0.00</span>
+          </div>
+          <div class="summary-row">
+            <span class="summary-label">Tax (15%):</span>
+            <span id="tax-display">Rs. 0.00</span>
+          </div>
+          <div class="summary-row">
+            <span class="summary-label">Total Amount:</span>
+            <span id="total-display">Rs. 0.00</span>
+          </div>
+        </div>
+
+        <div class="detail-section" id="notes-section" style="display: none;">
+          <h3>📝 Notes</h3>
+          <p id="notes-content" style="color: #666; line-height: 1.6;"></p>
+        </div>
+
+        <div class="action-buttons" style="margin-top: 30px;">
+          <a id="edit-link" href="#" class="btn btn-warning">✏️ Edit Invoice</a>
+          <button id="delete-btn" onclick="deleteInvoice()" class="btn btn-danger">🗑️ Delete Invoice</button>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    let currentInvoiceId = null;
+
+    // Get invoice ID from URL
+    window.onload = function() {
+      const urlParams = new URLSearchParams(window.location.search);
+      currentInvoiceId = urlParams.get('id');
+
+      if (!currentInvoiceId) {
+        Swal.fire({
+          icon: 'error',
+          title: 'Error',
+          text: 'No invoice ID provided'
+        }).then(() => {
+          window.location.href = 'invoices.html';
+        });
+        return;
+      }
+
+      loadInvoice(currentInvoiceId);
+    };
+
+    // Load invoice data
+    function loadInvoice(id) {
+      fetch(`get_invoice.php?id=${id}`)
+        .then(response => response.json())
+        .then(data => {
+          if (data.status === 'error') {
+            Swal.fire({
+              icon: 'error',
+              title: 'Error',
+              text: data.message
+            }).then(() => {
+              window.location.href = 'invoices.html';
+            });
+            return;
+          }
+
+          // Populate invoice details
+          document.getElementById('invoice-number').textContent = data.invoice_number;
+          document.getElementById('created-date').textContent = formatDateTime(data.created_at);
+          document.getElementById('invoice-date').textContent = formatDate(data.invoice_date);
+          document.getElementById('due-date').textContent = formatDate(data.due_date);
+          
+          document.getElementById('customer-name').textContent = data.customer_name;
+          document.getElementById('customer-email').textContent = data.customer_email || 'N/A';
+          document.getElementById('customer-phone').textContent = data.customer_phone || 'N/A';
+
+          // Status badge
+          const statusBadge = document.getElementById('status-badge');
+          const statusClass = `status-${data.status}`;
+          const statusText = data.status.charAt(0).toUpperCase() + data.status.slice(1);
+          statusBadge.className = `status-badge ${statusClass}`;
+          statusBadge.textContent = statusText;
+
+          // Load items
+          const items = JSON.parse(data.items);
+          const tbody = document.getElementById('items-tbody');
+          tbody.innerHTML = '';
+
+          items.forEach(item => {
+            const row = document.createElement('tr');
+            const itemTotal = item.quantity * item.unit_price;
+            
+            row.innerHTML = `
+              <td>${item.description}</td>
+              <td style="text-align: center;">${item.quantity}</td>
+              <td style="text-align: right;">Rs. ${parseFloat(item.unit_price).toFixed(2)}</td>
+              <td style="text-align: right;"><strong>Rs. ${itemTotal.toFixed(2)}</strong></td>
+            `;
+            
+            tbody.appendChild(row);
+          });
+
+          // Display totals
+          document.getElementById('subtotal-display').textContent = `Rs. ${parseFloat(data.subtotal).toFixed(2)}`;
+          document.getElementById('tax-display').textContent = `Rs. ${parseFloat(data.tax).toFixed(2)}`;
+          document.getElementById('total-display').textContent = `Rs. ${parseFloat(data.total).toFixed(2)}`;
+
+          // Display notes if available
+          if (data.notes && data.notes.trim() !== '') {
+            document.getElementById('notes-section').style.display = 'block';
+            document.getElementById('notes-content').textContent = data.notes;
+          }
+
+          // Set edit link
+          document.getElementById('edit-link').href = `edit_invoice.html?id=${data.id}`;
+
+          document.getElementById('loading').classList.add('hidden');
+          document.getElementById('invoice-detail').classList.remove('hidden');
+        })
+        .catch(error => {
+          console.error('Error:', error);
+          Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: 'Failed to load invoice'
+          }).then(() => {
+            window.location.href = 'invoices.html';
+          });
+        });
+    }
+
+    // Format date to readable format
+    function formatDate(dateString) {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      });
+    }
+
+    // Format datetime to readable format
+    function formatDateTime(dateString) {
+      const date = new Date(dateString);
+      return date.toLocaleString('en-US', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    }
+
+    // Delete invoice
+    function deleteInvoice() {
+      const invoiceNumber = document.getElementById('invoice-number').textContent;
+      
+      Swal.fire({
+        title: 'Are you sure?',
+        text: `Do you want to delete invoice ${invoiceNumber}?`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#f44336',
+        cancelButtonColor: '#666',
+        confirmButtonText: 'Yes, delete it!',
+        cancelButtonText: 'Cancel'
+      }).then((result) => {
+        if (result.isConfirmed) {
+          fetch('delete_invoice.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: currentInvoiceId })
+          })
+          .then(response => response.json())
+          .then(data => {
+            if (data.status === 'success') {
+              Swal.fire({
+                icon: 'success',
+                title: 'Deleted!',
+                text: 'Invoice has been deleted.',
+                timer: 2000,
+                showConfirmButton: false
+              }).then(() => {
+                window.location.href = 'invoices.html';
+              });
+            } else {
+              Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: data.message || 'Failed to delete invoice'
+              });
+            }
+          })
+          .catch(error => {
+            console.error('Error:', error);
+            Swal.fire({
+              icon: 'error',
+              title: 'Error',
+              text: 'Failed to delete invoice. Please try again.'
+            });
+          });
+        }
+      });
+    }
+  </script>
+</body>
+</html>

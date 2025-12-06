@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Edit Invoice</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>✏️ Edit Invoice</h1>
+      <p>Update invoice details</p>
+      <div class="nav-buttons">
+        <a href="invoices.html" class="btn btn-secondary">⬅️ Back to Invoices</a>
+      </div>
+    </header>
+
+    <main>
+      <div id="loading" class="loading">
+        <div class="spinner"></div>
+        <p>Loading invoice...</p>
+      </div>
+
+      <form id="invoice-form" class="hidden">
+        <input type="hidden" id="invoice_id">
+        
+        <div class="form-row">
+          <div class="form-group">
+            <label for="invoice_number">Invoice Number *</label>
+            <input type="text" id="invoice_number" required placeholder="INV-2025-001">
+          </div>
+          <div class="form-group">
+            <label for="status">Status *</label>
+            <select id="status" required>
+              <option value="pending">Pending</option>
+              <option value="paid">Paid</option>
+              <option value="overdue">Overdue</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="invoice_date">Invoice Date *</label>
+            <input type="date" id="invoice_date" required>
+          </div>
+          <div class="form-group">
+            <label for="due_date">Due Date *</label>
+            <input type="date" id="due_date" required>
+          </div>
+        </div>
+
+        <h3 style="margin-top: 30px; color: #667eea;">Customer Information</h3>
+        
+        <div class="form-group">
+          <label for="customer_name">Customer Name *</label>
+          <input type="text" id="customer_name" required placeholder="ABC Company Ltd">
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="customer_email">Customer Email</label>
+            <input type="email" id="customer_email" placeholder="customer@example.com">
+          </div>
+          <div class="form-group">
+            <label for="customer_phone">Customer Phone</label>
+            <input type="tel" id="customer_phone" placeholder="+94 11 234 5678">
+          </div>
+        </div>
+
+        <h3 style="margin-top: 30px; color: #667eea;">Invoice Items</h3>
+        
+        <div class="items-table">
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 40%;">Description</th>
+                <th style="width: 15%;">Quantity</th>
+                <th style="width: 20%;">Unit Price</th>
+                <th style="width: 20%;">Total</th>
+                <th style="width: 5%;"></th>
+              </tr>
+            </thead>
+            <tbody id="items-tbody">
+              <!-- Items will be added here -->
+            </tbody>
+          </table>
+        </div>
+
+        <button type="button" onclick="addItem()" class="btn btn-secondary add-item">➕ Add Item</button>
+
+        <div class="invoice-summary">
+          <div class="summary-row">
+            <span class="summary-label">Subtotal:</span>
+            <span id="subtotal-display">Rs. 0.00</span>
+          </div>
+          <div class="summary-row">
+            <span class="summary-label">Tax (15%):</span>
+            <span id="tax-display">Rs. 0.00</span>
+          </div>
+          <div class="summary-row">
+            <span class="summary-label">Total:</span>
+            <span id="total-display">Rs. 0.00</span>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="notes">Notes</label>
+          <textarea id="notes" placeholder="Additional notes or terms..."></textarea>
+        </div>
+
+        <div style="display: flex; gap: 15px; margin-top: 30px;">
+          <button type="submit" class="btn btn-primary" style="flex: 1;">💾 Update Invoice</button>
+          <a href="invoices.html" class="btn btn-danger">❌ Cancel</a>
+        </div>
+      </form>
+    </main>
+  </div>
+
+  <script>
+    let itemCounter = 0;
+    let invoiceId = null;
+
+    // Get invoice ID from URL
+    window.onload = function() {
+      const urlParams = new URLSearchParams(window.location.search);
+      invoiceId = urlParams.get('id');
+
+      if (!invoiceId) {
+        Swal.fire({
+          icon: 'error',
+          title: 'Error',
+          text: 'No invoice ID provided'
+        }).then(() => {
+          window.location.href = 'invoices.html';
+        });
+        return;
+      }
+
+      loadInvoice(invoiceId);
+    };
+
+    // Load invoice data
+    function loadInvoice(id) {
+      fetch(`get_invoice.php?id=${id}`)
+        .then(response => response.json())
+        .then(data => {
+          if (data.status === 'error') {
+            Swal.fire({
+              icon: 'error',
+              title: 'Error',
+              text: data.message
+            }).then(() => {
+              window.location.href = 'invoices.html';
+            });
+            return;
+          }
+
+          // Populate form fields
+          document.getElementById('invoice_id').value = data.id;
+          document.getElementById('invoice_number').value = data.invoice_number;
+          document.getElementById('customer_name').value = data.customer_name;
+          document.getElementById('customer_email').value = data.customer_email || '';
+          document.getElementById('customer_phone').value = data.customer_phone || '';
+          document.getElementById('invoice_date').value = data.invoice_date;
+          document.getElementById('due_date').value = data.due_date;
+          document.getElementById('status').value = data.status;
+          document.getElementById('notes').value = data.notes || '';
+
+          // Load items
+          const items = JSON.parse(data.items);
+          items.forEach(item => {
+            addItem(item);
+          });
+
+          calculateTotals();
+
+          document.getElementById('loading').classList.add('hidden');
+          document.getElementById('invoice-form').classList.remove('hidden');
+        })
+        .catch(error => {
+          console.error('Error:', error);
+          Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: 'Failed to load invoice'
+          }).then(() => {
+            window.location.href = 'invoices.html';
+          });
+        });
+    }
+
+    // Add new item row
+    function addItem(itemData = null) {
+      itemCounter++;
+      const tbody = document.getElementById('items-tbody');
+      const row = document.createElement('tr');
+      row.className = 'item-row';
+      row.id = `item-${itemCounter}`;
+      
+      const description = itemData ? itemData.description : '';
+      const quantity = itemData ? itemData.quantity : 1;
+      const price = itemData ? itemData.unit_price : 0;
+      
+      row.innerHTML = `
+        <td><input type="text" class="item-description" value="${description}" placeholder="Item description" required></td>
+        <td><input type="number" class="item-quantity" value="${quantity}" min="1" required onchange="calculateTotals()"></td>
+        <td><input type="number" class="item-price" value="${price}" min="0" step="0.01" required onchange="calculateTotals()"></td>
+        <td><input type="number" class="item-total" value="0" readonly></td>
+        <td><button type="button" class="remove-item" onclick="removeItem(${itemCounter})">×</button></td>
+      `;
+      
+      tbody.appendChild(row);
+    }
+
+    // Remove item row
+    function removeItem(id) {
+      const row = document.getElementById(`item-${id}`);
+      if (row) {
+        row.remove();
+        calculateTotals();
+      }
+    }
+
+    // Calculate all totals
+    function calculateTotals() {
+      let subtotal = 0;
+      const rows = document.querySelectorAll('.item-row');
+      
+      rows.forEach(row => {
+        const quantity = parseFloat(row.querySelector('.item-quantity').value) || 0;
+        const price = parseFloat(row.querySelector('.item-price').value) || 0;
+        const total = quantity * price;
+        
+        row.querySelector('.item-total').value = total.toFixed(2);
+        subtotal += total;
+      });
+
+      const tax = subtotal * 0.15; // 15% tax
+      const total = subtotal + tax;
+
+      document.getElementById('subtotal-display').textContent = `Rs. ${subtotal.toFixed(2)}`;
+      document.getElementById('tax-display').textContent = `Rs. ${tax.toFixed(2)}`;
+      document.getElementById('total-display').textContent = `Rs. ${total.toFixed(2)}`;
+    }
+
+    // Handle form submission
+    document.getElementById('invoice-form').addEventListener('submit', function(e) {
+      e.preventDefault();
+
+      // Collect items
+      const items = [];
+      const rows = document.querySelectorAll('.item-row');
+      
+      rows.forEach(row => {
+        const description = row.querySelector('.item-description').value;
+        const quantity = parseFloat(row.querySelector('.item-quantity').value);
+        const unit_price = parseFloat(row.querySelector('.item-price').value);
+        
+        if (description && quantity && unit_price) {
+          items.push({ description, quantity, unit_price });
+        }
+      });
+
+      if (items.length === 0) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'No Items',
+          text: 'Please add at least one item to the invoice.'
+        });
+        return;
+      }
+
+      // Calculate totals
+      const subtotal = items.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
+      const tax = subtotal * 0.15;
+      const total = subtotal + tax;
+
+      // Prepare invoice data
+      const invoiceData = {
+        id: parseInt(document.getElementById('invoice_id').value),
+        invoice_number: document.getElementById('invoice_number').value,
+        customer_name: document.getElementById('customer_name').value,
+        customer_email: document.getElementById('customer_email').value,
+        customer_phone: document.getElementById('customer_phone').value,
+        invoice_date: document.getElementById('invoice_date').value,
+        due_date: document.getElementById('due_date').value,
+        items: items,
+        subtotal: subtotal,
+        tax: tax,
+        total: total,
+        status: document.getElementById('status').value,
+        notes: document.getElementById('notes').value
+      };
+
+      // Submit to backend
+      fetch('update_invoice.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(invoiceData)
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.status === 'success' || data.status === 'info') {
+          Swal.fire({
+            icon: 'success',
+            title: 'Invoice Updated!',
+            text: 'The invoice has been updated successfully.',
+            showConfirmButton: true,
+            confirmButtonText: 'View Invoices'
+          }).then((result) => {
+            if (result.isConfirmed) {
+              window.location.href = 'invoices.html';
+            }
+          });
+        } else {
+          Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: data.message || 'Failed to update invoice'
+          });
+        }
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        Swal.fire({
+          icon: 'error',
+          title: 'Error',
+          text: 'Failed to update invoice. Please try again.'
+        });
+      });
+    });
+  </script>
+</body>
+</html>
