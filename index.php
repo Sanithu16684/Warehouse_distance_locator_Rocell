@@ -54,6 +54,8 @@
       <option value="">-- Select Location --</option>
     </select>
     <button onclick="calculateSelectedDistances()">Show Distances</button>
+    <hr>
+    <a href="invoices.html" style="display: block; padding: 10px; background: #667eea; color: white; text-decoration: none; text-align: center; border-radius: 5px; margin-top: 10px;">📋 Invoice Management</a>
   </div>
 
   <div id="map"></div>

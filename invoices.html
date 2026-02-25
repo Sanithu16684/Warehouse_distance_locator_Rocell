@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Invoice Management - All Invoices</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>📋 Invoice Management System</h1>
+      <p>View and manage all your invoices</p>
+      <div class="nav-buttons">
+        <a href="index.php" class="btn btn-secondary">🏠 Back to Map</a>
+        <a href="create_invoice.html" class="btn btn-primary">➕ Create New Invoice</a>
+      </div>
+    </header>
+
+    <main>
+      <div id="loading" class="loading">
+        <div class="spinner"></div>
+        <p>Loading invoices...</p>
+      </div>
+
+      <div id="invoice-list" class="hidden">
+        <div class="table-container">
+          <table id="invoices-table">
+            <thead>
+              <tr>
+                <th>Invoice #</th>
+                <th>Customer</th>
+                <th>Date</th>
+                <th>Due Date</th>
+                <th>Total</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="invoices-tbody">
+              <!-- Invoices will be loaded here -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="empty-state" class="empty-state hidden">
+        <div class="empty-state-icon">📭</div>
+        <h3>No Invoices Found</h3>
+        <p>Get started by creating your first invoice</p>
+        <a href="create_invoice.html" class="btn btn-primary">Create Invoice</a>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    // Load all invoices
+    function loadInvoices() {
+      fetch('get_invoices.php')
+        .then(response => response.json())
+        .then(data => {
+          const loading = document.getElementById('loading');
+          const invoiceList = document.getElementById('invoice-list');
+          const emptyState = document.getElementById('empty-state');
+          const tbody = document.getElementById('invoices-tbody');
+
+          loading.classList.add('hidden');
+
+          if (data.length === 0) {
+            emptyState.classList.remove('hidden');
+          } else {
+            invoiceList.classList.remove('hidden');
+            tbody.innerHTML = '';
+
+            data.forEach(invoice => {
+              const row = document.createElement('tr');
+              
+              const statusClass = `status-${invoice.status}`;
+              const statusText = invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1);
+              
+              row.innerHTML = `
+                <td><strong>${invoice.invoice_number}</strong></td>
+                <td>${invoice.customer_name}</td>
+                <td>${formatDate(invoice.invoice_date)}</td>
+                <td>${formatDate(invoice.due_date)}</td>
+                <td><strong>Rs. ${parseFloat(invoice.total).toFixed(2)}</strong></td>
+                <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+                <td>
+                  <div class="action-buttons">
+                    <a href="invoice_details.html?id=${invoice.id}" class="btn btn-info action-btn">👁️ View</a>
+                    <a href="edit_invoice.html?id=${invoice.id}" class="btn btn-warning action-btn">✏️ Edit</a>
+                    <button onclick="deleteInvoice(${invoice.id}, '${invoice.invoice_number}')" class="btn btn-danger action-btn">🗑️ Delete</button>
+                  </div>
+                </td>
+              `;
+              
+              tbody.appendChild(row);
+            });
+          }
+        })
+        .catch(error => {
+          console.error('Error loading invoices:', error);
+          document.getElementById('loading').classList.add('hidden');
+          Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: 'Failed to load invoices. Please try again.'
+          });
+        });
+    }
+
+    // Format date to readable format
+    function formatDate(dateString) {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'short', 
+        day: 'numeric' 
+      });
+    }
+
+    // Delete invoice
+    function deleteInvoice(id, invoiceNumber) {
+      Swal.fire({
+        title: 'Are you sure?',
+        text: `Do you want to delete invoice ${invoiceNumber}?`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#f44336',
+        cancelButtonColor: '#666',
+        confirmButtonText: 'Yes, delete it!',
+        cancelButtonText: 'Cancel'
+      }).then((result) => {
+        if (result.isConfirmed) {
+          fetch('delete_invoice.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: id })
+          })
+          .then(response => response.json())
+          .then(data => {
+            if (data.status === 'success') {
+              Swal.fire({
+                icon: 'success',
+                title: 'Deleted!',
+                text: 'Invoice has been deleted.',
+                timer: 2000,
+                showConfirmButton: false
+              });
+              loadInvoices(); // Reload the list
+            } else {
+              Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: data.message || 'Failed to delete invoice'
+              });
+            }
+          })
+          .catch(error => {
+            console.error('Error:', error);
+            Swal.fire({
+              icon: 'error',
+              title: 'Error',
+              text: 'Failed to delete invoice. Please try again.'
+            });
+          });
+        }
+      });
+    }
+
+    // Load invoices when page loads
+    window.onload = loadInvoices;
+  </script>
+</body>
+</html>
